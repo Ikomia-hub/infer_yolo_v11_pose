@@ -199,12 +199,12 @@ class InferYoloV11PoseFactory(dataprocess.CTaskFactory):
         self.info.authors = "Jocher, G., Chaurasia, A., & Qiu, J"
         self.info.article = "YOLO by Ultralytics"
         self.info.journal = ""
-        self.info.year = 2023
+        self.info.year = 2024
         self.info.license = "AGPL-3.0"
         # URL of documentation
         self.info.documentation_link = "https://docs.ultralytics.com/"
         # Code source repository
-        self.info.repository = "https://github.com/Ikomia-hub/infer_yolo_v8_pose_estimation"
+        self.info.repository = "https://github.com/Ikomia-hub/infer_yolo_v11_pose"
         self.info.original_repository = "https://github.com/ultralytics/ultralytics"
         # Keywords used for search
         self.info.keywords = "YOLO, pose, estimation, keypoints, ultralytics, coco"
