@@ -3,14 +3,8 @@ name: Ikomia HUB CI
 on:
   push:
     branches: ['**']
-  pull_request:
-    branches: ['**']
-    types:
-      - opened
-      - synchronize
-      - reopened
-      - ready_for_review
-      - labeled
+  pull_request_review:
+    types: [submitted]
   schedule:
     - cron: "0 * * * 1"  # Every Monday at 00:00
   workflow_dispatch:
@@ -18,7 +12,11 @@ on:
 permissions:
   contents: read
 
+# It's recommended to put these secrets at the organization level
 env:
+  IKOMIA_HUB_CI_DISCORD_WEBHOOK: ${{ secrets.IKOMIA_HUB_CI_DISCORD_WEBHOOK }}
+  IKOMIA_HUB_CI_SCW_LOKI_TOKEN: ${{ secrets.IKOMIA_HUB_CI_SCW_LOKI_TOKEN }}
+  IKOMIA_TOKEN: ${{ secrets.IKOMIA_HUB_CI_IKOMIA_TOKEN }}
   SCW_ACCESS_KEY: ${{ secrets.IKOMIA_HUB_CI_SCW_ACCESS_KEY }}
   SCW_SECRET_KEY: ${{ secrets.IKOMIA_HUB_CI_SCW_SECRET_KEY }}
   SCW_DEFAULT_ORGANIZATION_ID: ${{ secrets.IKOMIA_HUB_CI_SCW_DEFAULT_ORGANIZATION_ID }}
@@ -27,6 +25,8 @@ env:
 
 jobs:
   run:
+    # Only run on PR review if the review is approved
+    if: github.event_name != 'pull_request_review' || github.event.review.state == 'approved'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -40,4 +40,5 @@ jobs:
         env:
           IKOMIA_HUB_CI_URL: ${{ github.event.pull_request.head.repo.clone_url || github.repositoryUrl }}
           IKOMIA_HUB_CI_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
-          IKOMIA_HUB_CI_DISCORD_WEBHOOK: ${{ secrets.IKOMIA_HUB_CI_DISCORD_WEBHOOK }}
+          # IKOMIA_HUB_CI_PYTHON: "3.8 3.9"  # Uncomment to change the python versions to test
+          # IKOMIA_HUB_CI_PUSH_ON_SUCCESS: "${{ github.event_name == 'push' && github.ref == 'refs/heads/production' && 'True' || 'False' }}"
