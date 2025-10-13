@@ -2,7 +2,9 @@ name: Ikomia HUB CI
 
 on:
   push:
-    branches: ['**']
+    branches:
+      - production
+      - main
   pull_request_review:
     types: [submitted]
   schedule:
@@ -41,5 +43,7 @@ jobs:
         env:
           IKOMIA_HUB_CI_URL: ${{ github.event.pull_request.head.repo.clone_url || github.repositoryUrl }}
           IKOMIA_HUB_CI_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+          IKOMIA_HUB_CI_WAIT: ${{ github.event_name != 'schedule' && 'True' || 'False' }}  # Don't wait on cron jobs
+          IKOMIA_HUB_CI_DISCORD_WEBHOOK_ON_FAILURE: ${{github.event_name != 'pull_request_review' && 'True' || 'False' }}  # Don't send discord message on pr reviews
           # IKOMIA_HUB_CI_PYTHON: "3.8 3.9"  # Uncomment to change the python versions to test
           # IKOMIA_HUB_CI_PUSH_ON_SUCCESS: "${{ github.event_name == 'push' && github.ref == 'refs/heads/production' && 'True' || 'False' }}"
