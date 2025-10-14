@@ -10,6 +10,15 @@ on:
   schedule:
     - cron: "0 * * * 1"  # Every Monday at 00:00
   workflow_dispatch:
+    inputs:
+      wait:
+        description: 'Wait for the CI to finish'
+        type: boolean
+        default: true
+      send_webhook_on_failure:
+        description: 'Send a Discord webhook on failure'
+        type: boolean
+        default: false
       
 permissions:
   contents: read
@@ -38,12 +47,64 @@ jobs:
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
 
+      - name: Configure CI
+        id: configure
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          EVENT="${{ github.event_name }}"
+
+          RUN_URL="${{ github.repositoryUrl }}"
+          RUN_COMMIT="${{ github.sha }}"
+          RUN_USE_IKOMIA_REGISTRY="True"
+          RUN_WAIT="True"
+          RUN_WEBHOOK_ON_FAILURE="True"
+          RUN_PUSH_ON_SUCCESS="False"
+
+          if [ "${{ github.ref }}" = "refs/heads/production" ]; then
+            RUN_USE_IKOMIA_REGISTRY="False"  # Use PyPI registry for production branch
+          fi
+
+          if [ "$EVENT" = "push" ]; then
+            if [ "${{ github.ref }}" = "refs/heads/production" ]; then
+              RUN_PUSH_ON_SUCCESS="True"
+            fi
+          fi
+
+          if [ "$EVENT" = "pull_request_review" ]; then
+            RUN_URL="${{ github.event.pull_request.head.repo.clone_url }}"
+            RUN_COMMIT="${{ github.event.pull_request.head.sha }}"
+            RUN_WEBHOOK_ON_FAILURE="False"  # Don't send discord message on pr reviews
+          fi
+
+          if [ "$EVENT" = "schedule" ]; then
+            RUN_WAIT="False"  # Don't wait on cron jobs
+          fi
+
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            if [ "${{ github.event.inputs.wait }}" = "false" ]; then
+              RUN_WAIT="False"
+            fi
+            if [ "${{ github.event.inputs.send_webhook_on_failure }}" = "false" ]; then
+              RUN_WEBHOOK_ON_FAILURE="False"
+            fi
+          fi
+
+          echo "run_url=$RUN_URL" >> "$GITHUB_OUTPUT"
+          echo "run_commit=$RUN_COMMIT" >> "$GITHUB_OUTPUT"
+          echo "run_use_ikomia_registry=$RUN_USE_IKOMIA_REGISTRY" >> "$GITHUB_OUTPUT"
+          echo "run_wait=$RUN_WAIT" >> "$GITHUB_OUTPUT"
+          echo "run_webhook_on_failure=$RUN_WEBHOOK_ON_FAILURE" >> "$GITHUB_OUTPUT"
+          echo "run_push_on_success=$RUN_PUSH_ON_SUCCESS" >> "$GITHUB_OUTPUT"
+
       - name: Run Ikomia HUB CI
         run: uvx "ikomia-hub-ci[scaleway]" scaleway test
         env:
-          IKOMIA_HUB_CI_URL: ${{ github.event.pull_request.head.repo.clone_url || github.repositoryUrl }}
-          IKOMIA_HUB_CI_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
-          IKOMIA_HUB_CI_WAIT: ${{ github.event_name != 'schedule' && 'True' || 'False' }}  # Don't wait on cron jobs
-          IKOMIA_HUB_CI_DISCORD_WEBHOOK_ON_FAILURE: ${{github.event_name != 'pull_request_review' && 'True' || 'False' }}  # Don't send discord message on pr reviews
+          IKOMIA_HUB_CI_URL: ${{ steps.configure.outputs.run_url }}
+          IKOMIA_HUB_CI_COMMIT: ${{ steps.configure.outputs.run_commit }}
+          IKOMIA_HUB_CI_USE_IKOMIA_REGISTRY: ${{ steps.configure.outputs.run_use_ikomia_registry }}
+          IKOMIA_HUB_CI_WAIT: ${{ steps.configure.outputs.run_wait }}
+          IKOMIA_HUB_CI_DISCORD_WEBHOOK_ON_FAILURE: ${{ steps.configure.outputs.run_webhook_on_failure }}
+          # IKOMIA_HUB_CI_PUSH_ON_SUCCESS: ${{ steps.configure.outputs.run_push_on_success }}
           # IKOMIA_HUB_CI_PYTHON: "3.8 3.9"  # Uncomment to change the python versions to test
-          # IKOMIA_HUB_CI_PUSH_ON_SUCCESS: "${{ github.event_name == 'push' && github.ref == 'refs/heads/production' && 'True' || 'False' }}"
