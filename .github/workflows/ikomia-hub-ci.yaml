@@ -2,9 +2,7 @@ name: Ikomia HUB CI
 
 on:
   push:
-    branches:
-      - production
-      - main
+    branches: ['**']
   pull_request_review:
     types: [submitted]
   schedule:
