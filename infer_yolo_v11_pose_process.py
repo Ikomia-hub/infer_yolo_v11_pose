@@ -206,8 +206,8 @@ class InferYoloV11PoseFactory(dataprocess.CTaskFactory):
         self.info.short_description = "Inference with YOLOv11 pose estimation models"
         # relative path -> as displayed in Ikomia application process tree
         self.info.path = "Plugins/Python/Pose"
-        self.info.version = "1.1.1"
-        self.info.min_ikomia_version = "0.15.0"
+        self.info.version = "1.2.0"
+        self.info.min_ikomia_version = "0.16.0"
         self.info.icon_path = "images/icon.png"
         self.info.authors = "Jocher, G., Chaurasia, A., & Qiu, J"
         self.info.article = "YOLO by Ultralytics"
