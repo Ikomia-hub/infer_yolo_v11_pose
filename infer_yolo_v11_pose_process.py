@@ -1,6 +1,7 @@
 import copy
 import os
 
+import numpy as np
 import torch
 
 from ikomia import core, dataprocess, utils
@@ -59,15 +60,16 @@ class InferYoloV11Pose(dataprocess.CKeypointDetectionTask):
             self.set_param_object(InferYoloV11PoseParam())
         else:
             self.set_param_object(copy.deepcopy(param))
-        
+
         self.device = torch.device("cpu")
         self.model = None
         self.half = False
         self.model_name = None
         self.classes = ["person"]
         self.skeleton = [[16, 14], [14, 12], [17, 15], [15, 13], [12, 13], [6, 12],
-                            [7, 13], [6, 7], [6, 8], [7, 9], [8, 10], [9, 11], [2, 3],
-                            [1, 2], [1, 3], [2, 4], [3, 5], [4, 6], [5, 7]]
+                         [7, 13], [6, 7], [6, 8], [7, 9], [
+                             8, 10], [9, 11], [2, 3],
+                         [1, 2], [1, 3], [2, 4], [3, 5], [4, 6], [5, 7]]
 
         self.palette = [[255, 128, 0], [255, 153, 51], [255, 178, 102],
                         [230, 230, 0], [255, 153, 255], [153, 204, 255],
@@ -86,11 +88,14 @@ class InferYoloV11Pose(dataprocess.CKeypointDetectionTask):
 
     def _load_model(self):
         param = self.get_param_object()
-        self.device = torch.device("cuda") if param.cuda and torch.cuda.is_available() else torch.device("cpu")
+        self.device = torch.device(
+            "cuda") if param.cuda and torch.cuda.is_available() else torch.device("cpu")
         self.half = True if param.cuda and torch.cuda.is_available() else False
         # Set path
-        model_folder = os.path.join(os.path.dirname(os.path.realpath(__file__)), "weights")
-        model_weights = os.path.join(str(model_folder), f'{param.model_name}.pt')
+        model_folder = os.path.join(os.path.dirname(
+            os.path.realpath(__file__)), "weights")
+        model_weights = os.path.join(
+            str(model_folder), f'{param.model_name}.pt')
 
         # Download model if not exist
         if not os.path.isfile(model_weights):
@@ -116,6 +121,15 @@ class InferYoloV11Pose(dataprocess.CKeypointDetectionTask):
         self._load_model()
         super().init_long_process()
 
+    def _prepare_image(self, image):
+        image = np.asarray(image)
+        if image.ndim == 2:
+            image = np.repeat(image[:, :, None], 3, axis=2)
+        elif image.ndim == 3 and image.shape[2] == 4:
+            image = image[:, :, :3]
+
+        return np.ascontiguousarray(image)
+
     def run(self):
         # Core function of your process
         # Call begin_task_run() for initialization
@@ -128,6 +142,7 @@ class InferYoloV11Pose(dataprocess.CKeypointDetectionTask):
 
         # Get image from input/output (numpy array):
         src_image = img_input.get_image()
+        image = self._prepare_image(src_image)
 
         # Load model
         if param.update:
@@ -135,7 +150,7 @@ class InferYoloV11Pose(dataprocess.CKeypointDetectionTask):
 
         # Run detection
         results = self.model.predict(
-            src_image,
+            image,
             save=False,
             imgsz=param.input_size,
             conf=param.conf_thres,
@@ -148,7 +163,7 @@ class InferYoloV11Pose(dataprocess.CKeypointDetectionTask):
         boxes = results[0].boxes.xyxy
         confidences = results[0].boxes.conf
         keypoints_lists = results[0].keypoints.xy
-        
+
         for i, (box, conf, keypoints) in enumerate(zip(boxes, confidences, keypoints_lists)):
             box = box.detach().cpu().numpy()
             keypoints = keypoints.detach().cpu().numpy()
@@ -162,18 +177,21 @@ class InferYoloV11Pose(dataprocess.CKeypointDetectionTask):
             kept_kp_id = []
 
             for link in self.get_keypoint_links():
-                kp1, kp2 = kpts_data[link.start_point_index -1], kpts_data[link.end_point_index-1]
+                kp1, kp2 = kpts_data[link.start_point_index -
+                                     1], kpts_data[link.end_point_index-1]
                 x1, y1 = kp1
                 x2, y2 = kp2
 
                 if link.start_point_index not in kept_kp_id:
-                    if not [x1, y1]==[0,0]:
+                    if not [x1, y1] == [0, 0]:
                         kept_kp_id.append(link.start_point_index)
-                        keypts.append((link.start_point_index, dataprocess.CPointF(float(x1), float(y1))))
+                        keypts.append(
+                            (link.start_point_index, dataprocess.CPointF(float(x1), float(y1))))
                 if link.end_point_index not in kept_kp_id:
-                    if not [x2, y2]==[0,0]:
+                    if not [x2, y2] == [0, 0]:
                         kept_kp_id.append(link.end_point_index)
-                        keypts.append((link.end_point_index, dataprocess.CPointF(float(x2), float(y2))))
+                        keypts.append(
+                            (link.end_point_index, dataprocess.CPointF(float(x2), float(y2))))
 
             # Add object to display
             self.add_object(
@@ -197,6 +215,8 @@ class InferYoloV11Pose(dataprocess.CKeypointDetectionTask):
 # - Factory class to build process object
 # - Inherits PyDataProcess.CTaskFactory from Ikomia API
 # --------------------
+
+
 class InferYoloV11PoseFactory(dataprocess.CTaskFactory):
 
     def __init__(self):
@@ -206,7 +226,7 @@ class InferYoloV11PoseFactory(dataprocess.CTaskFactory):
         self.info.short_description = "Inference with YOLOv11 pose estimation models"
         # relative path -> as displayed in Ikomia application process tree
         self.info.path = "Plugins/Python/Pose"
-        self.info.version = "1.2.0"
+        self.info.version = "1.2.1"
         self.info.min_ikomia_version = "0.16.0"
         self.info.icon_path = "images/icon.png"
         self.info.authors = "Jocher, G., Chaurasia, A., & Qiu, J"
